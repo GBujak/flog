@@ -1,6 +1,6 @@
 use super::repo_scanning::get_repo_receiver;
 use anyhow::{anyhow, Result};
-use git2::Repository;
+use git2::{Branch, Repository};
 use std::thread;
 use std::{path::PathBuf, sync::mpsc};
 
@@ -8,6 +8,7 @@ use std::{path::PathBuf, sync::mpsc};
 pub struct RepoBranch {
     pub repo_name: PathBuf,
     pub branch_name: String,
+    pub latest_commit_sec: Option<i64>,
 }
 
 impl std::fmt::Display for RepoBranch {
@@ -34,23 +35,41 @@ pub fn collect_branches(base_dirs: &Vec<String>) -> Result<Vec<RepoBranch>> {
     }
     drop(sender);
 
-    Ok(receiver.into_iter().collect::<Vec<_>>())
+    let mut result = receiver.into_iter().collect::<Vec<_>>();
+    result.sort_unstable_by_key(|it| -it.latest_commit_sec.unwrap_or(0));
+    Ok(result)
 }
 
 fn get_branches_of_repo(repo: Repository) -> Result<Vec<RepoBranch>> {
     let mut result = Vec::new();
 
-    for branch in repo.branches(None)? {
-        let branch = branch?;
+    for branch_iter_result in repo.branches(None)? {
+        let (branch, _branch_type) = branch_iter_result?;
+
+        let branch_name = branch
+            .name()?
+            .ok_or(anyhow!("branch does not have name"))?
+            .to_owned();
+
+        let latest_commit_sec = get_latest_commit_epoch_sec(branch);
+
         result.push(RepoBranch {
             repo_name: repo.path().to_owned(),
-            branch_name: branch
-                .0
-                .name()?
-                .ok_or(anyhow!("branch does not have name"))?
-                .to_owned(),
+            branch_name,
+            latest_commit_sec,
         })
     }
 
     Ok(result)
+}
+
+fn get_latest_commit_epoch_sec(branch: Branch) -> Option<i64> {
+    Some(
+        branch
+            .into_reference()
+            .peel_to_commit()
+            .ok()?
+            .time()
+            .seconds(),
+    )
 }
