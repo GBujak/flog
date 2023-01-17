@@ -1,47 +1,39 @@
+use std::fmt::Display;
 use std::str::FromStr;
 
+use super::LogElement;
+use super::{printing::print_current_logs, WEEKDAYS};
 use crate::{
     configuration::{Configuration, TagConfiguration},
     repo::branch_collecting::RepoBranch,
 };
 use anyhow::{anyhow, Result};
-use chrono::{Datelike, Days, NaiveDate, Utc, Weekday};
-use serde::Serialize;
+use chrono::{Datelike, Days, Utc, Weekday};
 
-const WEEKDAYS: &'static [Weekday] = &[
-    Weekday::Mon,
-    Weekday::Tue,
-    Weekday::Wed,
-    Weekday::Thu,
-    Weekday::Fri,
-    Weekday::Sat,
-    Weekday::Sun,
-];
-
-pub struct LogElement {
-    pub ticket: String,
-    pub tag: Option<String>,
-    pub hours: u8,
-    pub date: NaiveDate,
+enum UserAction {
+    ContinueAdding,
+    Done,
+    ClearDays,
 }
 
-impl LogElement {
-    pub fn to_serializable(self) -> LogElementSerializable {
-        LogElementSerializable {
-            ticket: self.ticket,
-            tag: self.tag,
-            hours: self.hours,
-            date: self.date.to_string(),
-        }
+impl Display for UserAction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::ContinueAdding => "Continue adding",
+                Self::Done => "Finish",
+                Self::ClearDays => "Clear Days",
+            }
+        )
     }
 }
 
-#[derive(Serialize)]
-pub struct LogElementSerializable {
-    ticket: String,
-    tag: Option<String>,
-    hours: u8,
-    date: String,
+impl UserAction {
+    fn iter() -> impl Iterator<Item = Self> {
+        [Self::ContinueAdding, Self::Done, Self::ClearDays].into_iter()
+    }
 }
 
 pub fn inquire_log(config: &Configuration, branches: &Vec<RepoBranch>) -> Result<Vec<LogElement>> {
@@ -59,7 +51,7 @@ pub fn inquire_log(config: &Configuration, branches: &Vec<RepoBranch>) -> Result
             .ok_or(anyhow!("could not get monday"))?;
     }
 
-    loop {
+    'main_loop: loop {
         let days_of_week = inquire_days_of_week()?;
 
         let untagged_hours =
@@ -93,11 +85,13 @@ pub fn inquire_log(config: &Configuration, branches: &Vec<RepoBranch>) -> Result
 
         print_current_logs(&result);
 
-        let should_continue = inquire::Confirm::new("Create more logs for this week?")
-            .with_default(true)
-            .prompt()?;
-        if !should_continue {
-            break;
+        match inquire_action()? {
+            UserAction::ContinueAdding => {}
+            UserAction::Done => break 'main_loop,
+            UserAction::ClearDays => {
+                inquire_and_clear_days(&mut result)?;
+                print_current_logs(&result);
+            }
         }
     }
 
@@ -136,26 +130,12 @@ fn make_tag(branch_name: &str, tag_configuration: &TagConfiguration) -> String {
     }
 }
 
-fn print_current_logs(logs: &Vec<LogElement>) {
-    println!("=== Current time logs: ===");
+fn inquire_action() -> Result<UserAction> {
+    Ok(inquire::Select::new("What to do next?", UserAction::iter().collect()).prompt()?)
+}
 
-    for weekday in WEEKDAYS {
-        let mut logs_for_weekday = logs
-            .iter()
-            .filter(|it| &it.date.weekday() == weekday)
-            .collect::<Vec<_>>();
-
-        logs_for_weekday.sort_by_key(|it| it.hours);
-        logs_for_weekday.reverse();
-
-        println!("{}", weekday.to_string());
-        for log in logs_for_weekday {
-            println!(
-                "\t{}h : [{}] {}",
-                log.hours,
-                log.ticket,
-                log.tag.as_ref().unwrap_or(&String::new())
-            );
-        }
-    }
+fn inquire_and_clear_days(current_results: &mut Vec<LogElement>) -> Result<()> {
+    let days = inquire_days_of_week()?;
+    current_results.retain(|it| !days.contains(&it.date.weekday()));
+    Ok(())
 }
