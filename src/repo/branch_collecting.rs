@@ -1,6 +1,6 @@
 use super::repo_scanning::get_repo_receiver;
 use anyhow::{anyhow, Result};
-use git2::{Branch, Repository};
+use git2::{Branch, BranchType, Repository};
 use std::thread;
 use std::{path::PathBuf, sync::mpsc};
 
@@ -43,7 +43,7 @@ pub fn collect_branches(base_dirs: &Vec<String>) -> Result<Vec<RepoBranch>> {
 fn get_branches_of_repo(repo: Repository) -> Result<Vec<RepoBranch>> {
     let mut result = Vec::new();
 
-    for branch_iter_result in repo.branches(None)? {
+    for branch_iter_result in repo.branches(Some(BranchType::Local))? {
         let (branch, _branch_type) = branch_iter_result?;
 
         let branch_name = branch
