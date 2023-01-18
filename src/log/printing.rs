@@ -5,7 +5,7 @@ use prettytable::{row, Cell, Table};
 
 pub fn print_logs_table(mut logs: Vec<LogElement>) {
     let mut table = Table::new();
-    let mut header = row![""];
+    let mut header = row!["Ticket"];
     for weekday_str in &weekday_strs() {
         header.add_cell(Cell::new(weekday_str));
     }
