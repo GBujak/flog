@@ -38,8 +38,6 @@ impl UserAction {
 }
 
 pub fn inquire_log(config: &Configuration, branches: &Vec<RepoBranch>) -> Result<Vec<LogElement>> {
-    let mut log_buffer = LogBuffer::new();
-
     let mut day = inquire::DateSelect::new("Select week to log (day of week doesn't matter)")
         .with_vim_mode(true)
         .with_default(Utc::now().date_naive())
@@ -52,15 +50,20 @@ pub fn inquire_log(config: &Configuration, branches: &Vec<RepoBranch>) -> Result
             .ok_or(anyhow!("could not get monday"))?;
     }
 
+    let untagged_hours =
+        inquire::CustomType::<u8>::new("How much untagged work per day?").prompt()?;
+
+    let untagged_work_ticket = inquire_ticket(
+        &config.default_project,
+        Some("Which ticket to log untagged work for"),
+    )?;
+
+    let mut log_buffer = LogBuffer::new(untagged_work_ticket, untagged_hours);
+
     'main_loop: loop {
         let days_of_week = inquire_days_of_week()?;
 
-        let untagged_hours =
-            inquire::CustomType::<u8>::new("How much untagged work per day?").prompt()?;
-
-        let ticket = inquire::Text::new("Which ticket to log for?")
-            .with_default(&config.default_project)
-            .prompt()?;
+        let ticket = inquire_ticket(&config.default_project, None)?;
 
         let branch =
             inquire::Select::new("Which branch to log work on?", branches.clone()).prompt()?;
@@ -71,19 +74,25 @@ pub fn inquire_log(config: &Configuration, branches: &Vec<RepoBranch>) -> Result
             log_buffer.log_on_day(day_of_week, &ticket, &tag.clone())
         }
 
-        print_logs_table(log_buffer.to_serializable(&day, untagged_hours, &ticket));
+        print_logs_table(log_buffer.to_serializable(&day));
 
         match inquire_action()? {
             UserAction::ContinueAdding => {}
             UserAction::ClearDays => {
                 inquire_and_clear_days(&mut log_buffer)?;
-                print_logs_table(log_buffer.to_serializable(&day, untagged_hours, &ticket));
+                print_logs_table(log_buffer.to_serializable(&day));
             }
-            UserAction::Done => {
-                break 'main_loop Ok(log_buffer.to_serializable(&day, untagged_hours, &ticket))
-            }
+            UserAction::Done => break 'main_loop Ok(log_buffer.to_serializable(&day)),
         }
     }
+}
+
+fn inquire_ticket(default_ticket: &str, msg: Option<&'static str>) -> Result<String> {
+    Ok(
+        inquire::Text::new(msg.unwrap_or("Which ticket to log for?"))
+            .with_default(default_ticket)
+            .prompt()?,
+    )
 }
 
 fn inquire_days_of_week() -> Result<Vec<Weekday>> {
@@ -98,11 +107,11 @@ fn inquire_days_of_week() -> Result<Vec<Weekday>> {
 }
 
 fn inquire_tag_name(branch: &RepoBranch, config: &Configuration) -> Result<Option<String>> {
-    let tag = inquire::Text::new("Override tag name:")
+    let tag = inquire::Text::new("Override tag name [type `untag` for untagged work]:")
         .with_default(&make_tag(&branch.branch_name, &config.tag_configuration))
         .prompt()?;
 
-    Ok(if tag.len() == 0 { None } else { Some(tag) })
+    Ok(if tag == "untag" { None } else { Some(tag) })
 }
 
 fn make_tag(branch_name: &str, tag_configuration: &TagConfiguration) -> String {

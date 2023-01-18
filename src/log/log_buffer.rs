@@ -6,17 +6,22 @@ use super::LogElement;
 
 pub struct LogBuffer {
     buffer: HashMap<Weekday, Vec<BufElement>>,
+    untagged_ticket: String,
+    untagged_per_day: u8,
 }
 
+#[derive(Debug)]
 struct BufElement {
     pub ticket: String,
     pub tag: Option<String>,
 }
 
 impl LogBuffer {
-    pub fn new() -> Self {
+    pub fn new(untagged_ticket: String, untagged_per_day: u8) -> Self {
         LogBuffer {
             buffer: HashMap::new(),
+            untagged_per_day,
+            untagged_ticket,
         }
     }
 
@@ -31,12 +36,7 @@ impl LogBuffer {
         })
     }
 
-    pub fn to_serializable(
-        &self,
-        week_start: &NaiveDate,
-        untagged_per_day: u8,
-        untagged_ticket: &str,
-    ) -> Vec<LogElement> {
+    pub fn to_serializable(&self, week_start: &NaiveDate) -> Vec<LogElement> {
         let mut result = Vec::new();
 
         for (weekday, buf_elements) in self.buffer.iter() {
@@ -52,7 +52,14 @@ impl LogBuffer {
                 })
                 .collect::<Vec<_>>();
 
-            let mut time_left = 8_u8 - untagged_per_day;
+            let should_add_untagged_work_for_current_day =
+                !tmp_result.iter().any(|it| it.tag.is_none());
+
+            let mut time_left = if should_add_untagged_work_for_current_day {
+                8_u8 - self.untagged_per_day
+            } else {
+                8_u8
+            };
 
             for index in (0..tmp_result.len()).cycle() {
                 tmp_result[index].hours += 1;
@@ -63,13 +70,13 @@ impl LogBuffer {
                 }
             }
 
-            if !tmp_result.iter().any(|it| it.tag.is_none()) {
+            if should_add_untagged_work_for_current_day {
                 tmp_result.push(LogElement {
-                    ticket: untagged_ticket.into(),
+                    ticket: self.untagged_ticket.clone(),
                     tag: None,
-                    hours: untagged_per_day,
+                    hours: self.untagged_per_day,
                     date,
-                })
+                });
             }
 
             result.append(&mut tmp_result)
