@@ -6,6 +6,7 @@ mod repo;
 use anyhow::{anyhow, Result};
 use arboard::Clipboard;
 use clap::Parser;
+use itertools::Itertools;
 use log::inquire_log;
 
 fn main() -> Result<()> {
@@ -39,9 +40,7 @@ fn main() -> Result<()> {
             let branches = repo::branch_collecting::collect_branches(&config.repo_dirs)?;
             let log = inquire_log(&config, &branches)?;
             let log_json = serde_json::to_string_pretty(
-                &log.into_iter()
-                    .map(|it| it.to_serializable())
-                    .collect::<Vec<_>>(),
+                &log.into_iter().map(|it| it.to_serializable()).collect_vec(),
             )?;
 
             Clipboard::new()?.set_text(&log_json)?;

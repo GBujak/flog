@@ -1,5 +1,6 @@
 use anyhow::Context;
 use chrono::{Days, NaiveDate, Weekday};
+use itertools::Itertools;
 use std::collections::HashMap;
 
 use super::LogElement;
@@ -50,7 +51,7 @@ impl LogBuffer {
                     hours: 0,
                     date: date.clone(),
                 })
-                .collect::<Vec<_>>();
+                .collect_vec();
 
             let should_add_untagged_work_for_current_day =
                 !tmp_result.iter().any(|it| it.tag.is_none());

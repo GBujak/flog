@@ -102,7 +102,7 @@ fn inquire_days_of_week() -> Result<Vec<Weekday>> {
             .prompt()?
             .iter()
             .map(|it| Weekday::from_str(it).unwrap())
-            .collect::<Vec<_>>(),
+            .collect(),
     )
 }
 

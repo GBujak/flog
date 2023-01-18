@@ -1,6 +1,7 @@
 use super::repo_scanning::get_repo_receiver;
 use anyhow::{anyhow, Result};
 use git2::{Branch, BranchType, Repository};
+use itertools::Itertools;
 use std::thread;
 use std::{path::PathBuf, sync::mpsc};
 
@@ -35,7 +36,7 @@ pub fn collect_branches(base_dirs: &Vec<String>) -> Result<Vec<RepoBranch>> {
     }
     drop(sender);
 
-    let mut result = receiver.into_iter().collect::<Vec<_>>();
+    let mut result = receiver.into_iter().collect_vec();
     result.sort_unstable_by_key(|it| -it.latest_commit_sec.unwrap_or(0));
     Ok(result)
 }
