@@ -1,8 +1,9 @@
 use std::fmt::Display;
 use std::str::FromStr;
 
+use super::printing::print_logs_table;
 use super::LogElement;
-use super::{printing::print_current_logs, WEEKDAYS};
+use super::{log_buffer::LogBuffer, weekday_strs};
 use crate::{
     configuration::{Configuration, TagConfiguration},
     repo::branch_collecting::RepoBranch,
@@ -37,7 +38,7 @@ impl UserAction {
 }
 
 pub fn inquire_log(config: &Configuration, branches: &Vec<RepoBranch>) -> Result<Vec<LogElement>> {
-    let mut result = Vec::<LogElement>::new();
+    let mut log_buffer = LogBuffer::new();
 
     let mut day = inquire::DateSelect::new("Select week to log (day of week doesn't matter)")
         .with_vim_mode(true)
@@ -67,41 +68,27 @@ pub fn inquire_log(config: &Configuration, branches: &Vec<RepoBranch>) -> Result
         let tag = inquire_tag_name(&branch, config)?;
 
         for day_of_week in days_of_week {
-            for (hours, tag) in [(untagged_hours, None), (8 - untagged_hours, tag.clone())] {
-                if hours <= 0 {
-                    continue;
-                }
-
-                result.push(LogElement {
-                    ticket: ticket.clone(),
-                    tag,
-                    hours,
-                    date: day
-                        .checked_add_days(Days::new(day_of_week.num_days_from_monday() as u64))
-                        .unwrap(),
-                })
-            }
+            log_buffer.log_on_day(day_of_week, &ticket, &tag.clone())
         }
 
-        print_current_logs(&result);
+        print_logs_table(log_buffer.to_serializable(&day, untagged_hours, &ticket));
 
         match inquire_action()? {
             UserAction::ContinueAdding => {}
-            UserAction::Done => break 'main_loop,
             UserAction::ClearDays => {
-                inquire_and_clear_days(&mut result)?;
-                print_current_logs(&result);
+                inquire_and_clear_days(&mut log_buffer)?;
+                print_logs_table(log_buffer.to_serializable(&day, untagged_hours, &ticket));
+            }
+            UserAction::Done => {
+                break 'main_loop Ok(log_buffer.to_serializable(&day, untagged_hours, &ticket))
             }
         }
     }
-
-    Ok(result)
 }
 
 fn inquire_days_of_week() -> Result<Vec<Weekday>> {
-    let weekdays_strs = WEEKDAYS.iter().map(|it| it.to_string()).collect::<Vec<_>>();
     Ok(
-        inquire::MultiSelect::new("Select days with the same worklog.", weekdays_strs)
+        inquire::MultiSelect::new("Select days with the same worklog.", weekday_strs())
             .with_vim_mode(true)
             .prompt()?
             .iter()
@@ -134,8 +121,10 @@ fn inquire_action() -> Result<UserAction> {
     Ok(inquire::Select::new("What to do next?", UserAction::iter().collect()).prompt()?)
 }
 
-fn inquire_and_clear_days(current_results: &mut Vec<LogElement>) -> Result<()> {
+fn inquire_and_clear_days(log_buffer: &mut LogBuffer) -> Result<()> {
     let days = inquire_days_of_week()?;
-    current_results.retain(|it| !days.contains(&it.date.weekday()));
+    for day in days {
+        log_buffer.clear_day(day);
+    }
     Ok(())
 }

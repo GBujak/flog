@@ -1,7 +1,9 @@
 use chrono::{NaiveDate, Weekday};
+use itertools::Itertools;
 use serde::Serialize;
 
 mod inquires;
+mod log_buffer;
 mod printing;
 
 pub use inquires::inquire_log;
@@ -15,6 +17,10 @@ const WEEKDAYS: &'static [Weekday] = &[
     Weekday::Sat,
     Weekday::Sun,
 ];
+
+fn weekday_strs() -> Vec<String> {
+    WEEKDAYS.into_iter().map(Weekday::to_string).collect_vec()
+}
 
 pub struct LogElement {
     pub ticket: String,
