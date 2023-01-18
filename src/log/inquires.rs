@@ -74,15 +74,15 @@ pub fn inquire_log(config: &Configuration, branches: &Vec<RepoBranch>) -> Result
             log_buffer.log_on_day(day_of_week, &ticket, &tag.clone())
         }
 
-        print_logs_table(log_buffer.to_serializable(&day));
+        print_logs_table(log_buffer.to_log_element_vec(&day));
 
         match inquire_action()? {
             UserAction::ContinueAdding => {}
             UserAction::ClearDays => {
                 inquire_and_clear_days(&mut log_buffer)?;
-                print_logs_table(log_buffer.to_serializable(&day));
+                print_logs_table(log_buffer.to_log_element_vec(&day));
             }
-            UserAction::Done => break 'main_loop Ok(log_buffer.to_serializable(&day)),
+            UserAction::Done => break 'main_loop Ok(log_buffer.to_log_element_vec(&day)),
         }
     }
 }

@@ -36,7 +36,7 @@ impl LogBuffer {
         })
     }
 
-    pub fn to_serializable(&self, week_start: &NaiveDate) -> Vec<LogElement> {
+    pub fn to_log_element_vec(&self, week_start: &NaiveDate) -> Vec<LogElement> {
         let mut result = Vec::new();
 
         for (weekday, buf_elements) in self.buffer.iter() {
