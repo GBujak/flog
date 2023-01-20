@@ -5,6 +5,8 @@ use std::collections::HashMap;
 
 use super::LogElement;
 
+const TIME_PER_DAY: u8 = 8_u8;
+
 pub struct LogBuffer {
     buffer: HashMap<Weekday, Vec<BufElement>>,
     untagged_ticket: String,
@@ -19,6 +21,9 @@ struct BufElement {
 
 impl LogBuffer {
     pub fn new(untagged_ticket: String, untagged_per_day: u8) -> Self {
+        if untagged_per_day > TIME_PER_DAY {
+            panic!("More than {TIME_PER_DAY} hours of untagged time per day");
+        }
         LogBuffer {
             buffer: HashMap::new(),
             untagged_per_day,
@@ -57,18 +62,21 @@ impl LogBuffer {
                 !tmp_result.iter().any(|it| it.tag.is_none());
 
             let mut time_left = if should_add_untagged_work_for_current_day {
-                8_u8 - self.untagged_per_day
+                TIME_PER_DAY
+                    .checked_sub(self.untagged_per_day)
+                    .context("Overflow when calculating available time for tickets")
+                    .unwrap()
             } else {
-                8_u8
+                TIME_PER_DAY
             };
 
             for index in (0..tmp_result.len()).cycle() {
-                tmp_result[index].hours += 1;
-                time_left -= 1;
-
                 if time_left == 0 {
                     break;
                 }
+
+                tmp_result[index].hours += 1;
+                time_left -= 1;
             }
 
             if should_add_untagged_work_for_current_day {
