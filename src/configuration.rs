@@ -10,7 +10,7 @@ const CONFIG_FILE_NAME: &'static str = "flog-config.json";
 #[derive(Deserialize, Serialize, Clone)]
 pub struct Configuration {
     pub repo_dirs: Vec<String>,
-    pub default_project: String,
+    pub projects: Vec<String>,
     pub tag_configuration: TagConfiguration,
 }
 
@@ -18,7 +18,7 @@ impl Default for Configuration {
     fn default() -> Self {
         Self {
             repo_dirs: vec![],
-            default_project: "PROJ".to_string(),
+            projects: vec![],
             tag_configuration: TagConfiguration {
                 separator: "/".to_string(),
                 element_index: 1,

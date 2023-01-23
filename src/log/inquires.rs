@@ -50,11 +50,17 @@ pub fn inquire_log(config: &Configuration, branches: &Vec<RepoBranch>) -> Result
             .ok_or(anyhow!("could not get monday"))?;
     }
 
-    let untagged_hours =
-        inquire::CustomType::<u8>::new("How much untagged work per day?").prompt()?;
+    let untagged_hours = loop {
+        let hours = inquire::CustomType::<u8>::new("How much untagged work per day?").prompt()?;
+        if hours > 8 {
+            println!("Hours cannot be more than 8");
+        } else {
+            break hours;
+        }
+    };
 
     let untagged_work_ticket = inquire_ticket(
-        &config.default_project,
+        &config.projects,
         Some("Which ticket to log untagged work for"),
     )?;
 
@@ -63,7 +69,7 @@ pub fn inquire_log(config: &Configuration, branches: &Vec<RepoBranch>) -> Result
     'main_loop: loop {
         let days_of_week = inquire_days_of_week()?;
 
-        let ticket = inquire_ticket(&config.default_project, None)?;
+        let ticket = inquire_ticket(&config.projects, None)?;
 
         let branch =
             inquire::Select::new("Which branch to log work on?", branches.clone()).prompt()?;
@@ -87,10 +93,10 @@ pub fn inquire_log(config: &Configuration, branches: &Vec<RepoBranch>) -> Result
     }
 }
 
-fn inquire_ticket(default_ticket: &str, msg: Option<&'static str>) -> Result<String> {
+fn inquire_ticket(tickets: &Vec<String>, msg: Option<&'static str>) -> Result<String> {
     Ok(
-        inquire::Text::new(msg.unwrap_or("Which ticket to log for?"))
-            .with_default(default_ticket)
+        inquire::Select::new(msg.unwrap_or("Which ticket to log for?"), tickets.clone())
+            .with_vim_mode(true)
             .prompt()?,
     )
 }
@@ -127,7 +133,11 @@ fn make_tag(branch_name: &str, tag_configuration: &TagConfiguration) -> String {
 }
 
 fn inquire_action() -> Result<UserAction> {
-    Ok(inquire::Select::new("What to do next?", UserAction::iter().collect()).prompt()?)
+    Ok(
+        inquire::Select::new("What to do next?", UserAction::iter().collect())
+            .with_vim_mode(true)
+            .prompt()?,
+    )
 }
 
 fn inquire_and_clear_days(log_buffer: &mut LogBuffer) -> Result<()> {

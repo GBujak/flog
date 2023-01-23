@@ -25,6 +25,12 @@ fn main() -> Result<()> {
         cli::ArgsSubcommand::RmDir { dir_name } => {
             config.repo_dirs.retain(|it| it != &dir_name);
         }
+        cli::ArgsSubcommand::AddTicket { ticket_name } => {
+            config.projects.push(ticket_name);
+        }
+        cli::ArgsSubcommand::RmTicket { ticket_name } => {
+            config.projects.retain(|it| it != &ticket_name);
+        }
         cli::ArgsSubcommand::SetBranchFormat { separator, index } => {
             config.tag_configuration.separator = separator;
             config.tag_configuration.element_index = index;
@@ -36,6 +42,9 @@ fn main() -> Result<()> {
         cli::ArgsSubcommand::Log => {
             if config.repo_dirs.len() == 0 {
                 return Err(anyhow!("Must set at least one repo dir before logging!"));
+            }
+            if config.projects.len() == 0 {
+                return Err(anyhow!("Must set at least one project before logging!"));
             }
             let branches = repo::branch_collecting::collect_branches(&config.repo_dirs)?;
             let log = inquire_log(&config, &branches)?;
